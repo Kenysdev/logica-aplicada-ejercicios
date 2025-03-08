@@ -400,3 +400,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 # ____________________________________________________________
+# Other
+# Ignore all .env files in the node_modules directory
+**/.env
