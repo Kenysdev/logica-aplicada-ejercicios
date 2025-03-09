@@ -5,7 +5,7 @@ using Stripe;
 
 class StripeMgr
 {
-    public StripeMgr(string secretKey)
+    public static void Connect(string secretKey)
     {
         try
         {
@@ -148,6 +148,15 @@ class StripeMgr
                 Customer = customerId
             });
 
+            var customerService = new CustomerService();
+            customerService.Update(customerId, new CustomerUpdateOptions
+            {
+                InvoiceSettings = new CustomerInvoiceSettingsOptions
+                {
+                    DefaultPaymentMethod = paymentMethodId
+                }
+            });
+
             Console.WriteLine("Método de pago asociado al cliente exitosamente:");
             Console.WriteLine($"ID: {paymentMethod.Id}");
             Console.WriteLine($"Tipo: {paymentMethod.Type}");
@@ -159,4 +168,79 @@ class StripeMgr
         }
     }
 
+    public class ProductDetails
+    {
+        public required string Name { get; set; }
+        public required string Description { get; set; }
+        public long Price { get; set; }
+        public required string Currency { get; set; }
+    }
+
+    public static ProductDetails GetProduct(string productId)
+    {
+        try
+        {
+            var service = new ProductService();
+            var product = service.Get(productId);
+
+            if (product == null)
+            {
+                throw new InvalidOperationException("El producto o el precio por defecto no se encontraron.");
+            }
+
+            var priceService = new PriceService();
+            var price = priceService.Get(product.DefaultPriceId);
+
+            return new ProductDetails
+            {
+                Name = product.Name,
+                Description = product.Description,
+                Price = price.UnitAmount ?? 0,
+                Currency = price.Currency
+            };
+        }
+        catch (StripeException e)
+        {
+            throw new InvalidOperationException($"Error: {e.Message}");
+        }
+    }
+
+    public static string BuyProduct(string customerId, string productId, int quantity)
+    {
+        try
+        {
+            var productDetails = GetProduct(productId);
+
+            var customerService = new CustomerService();
+            var customer = customerService.Get(customerId);
+
+            if (customer.InvoiceSettings.DefaultPaymentMethodId == null)
+            {
+                throw new InvalidOperationException("El cliente no tiene un método de pago predeterminado.");
+            }
+
+            var paymentIntentService = new PaymentIntentService();
+            var paymentIntent = paymentIntentService.Create(new PaymentIntentCreateOptions
+            {
+                Amount = productDetails.Price * quantity,
+                Currency = productDetails.Currency,
+                Customer = customerId,
+                PaymentMethod = customer.InvoiceSettings.DefaultPaymentMethodId,
+                PaymentMethodTypes = new List<string> { "card" },
+                Description = $"Compra de {quantity} x {productDetails.Name} (ID: {productId})",
+                Confirm = true,
+                OffSession = true
+            });
+
+            Console.WriteLine("Producto comprado exitosamente:");
+            Console.WriteLine($"ID: {paymentIntent.Id}");
+            Console.WriteLine($"Estado: {paymentIntent.Status}");
+
+            return paymentIntent.Id;
+        }
+        catch (StripeException e)
+        {
+            throw new InvalidOperationException($"Error: {e.Message}");
+        }
+    }
 }
