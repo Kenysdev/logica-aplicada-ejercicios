@@ -1,4 +1,4 @@
-namespace StripePayment;
+namespace StripeManager;
 
 using System;
 using Stripe;
@@ -45,7 +45,7 @@ class StripeMgr
         }
     }
 
-    public static void CreateCustomer(string email, string name, string description, string phone)
+    public static string CreateCustomer(string email, string name, string description, string phone)
     {
         try
         {
@@ -69,6 +69,89 @@ class StripeMgr
             Console.WriteLine($"ID: {customer.Id}");
             Console.WriteLine($"Email: {customer.Email}");
             Console.WriteLine($"Nombre: {customer.Name}");
+
+            return customer.Id;
+        }
+        catch (StripeException e)
+        {
+            throw new InvalidOperationException($"Error: {e.Message}");
+        }
+    }
+
+    public static string CreateProduct(string name, string description, long price)
+    {
+        try
+        {
+            var options = new ProductCreateOptions
+            {
+                Name = name,
+                Description = description,
+                DefaultPriceData = new ProductDefaultPriceDataOptions
+                {
+                    UnitAmount = price,
+                    Currency = "usd"
+                }
+            };
+
+            var service = new ProductService();
+            var product = service.Create(options);
+
+            Console.WriteLine("Producto creado exitosamente:");
+            Console.WriteLine($"ID: {product.Id}");
+            Console.WriteLine($"Nombre: {product.Name}");
+            Console.WriteLine($"Descripción: {product.Description}");
+
+            return product.Id;
+        }
+        catch (StripeException e)
+        {
+            throw new InvalidOperationException($"Error: {e.Message}");
+        }
+    }
+
+    public static string CreatePaymentMethod(string cardToken)
+    {
+        try
+        {
+            var options = new PaymentMethodCreateOptions
+            {
+                Type = "card",
+                Card = new PaymentMethodCardOptions
+                {
+                    Token = cardToken
+                }
+            };
+
+            var service = new PaymentMethodService();
+            var paymentMethod = service.Create(options);
+
+            Console.WriteLine("Método de pago creado exitosamente:");
+            Console.WriteLine($"ID: {paymentMethod.Id}");
+            Console.WriteLine($"Tipo: {paymentMethod.Type}");
+            Console.WriteLine($"Marca: {paymentMethod.Card.Brand}");
+
+            return paymentMethod.Id;
+        }
+        catch (StripeException e)
+        {
+            throw new InvalidOperationException($"Error: {e.Message}");
+        }
+    }
+
+    public static void AttachPaymentMethod(string customerId, string paymentMethodId)
+    {
+        try
+        {
+            var service = new PaymentMethodService();
+            var paymentMethod = service.Attach(paymentMethodId, new PaymentMethodAttachOptions
+            {
+                Customer = customerId
+            });
+
+            Console.WriteLine("Método de pago asociado al cliente exitosamente:");
+            Console.WriteLine($"ID: {paymentMethod.Id}");
+            Console.WriteLine($"Tipo: {paymentMethod.Type}");
+            Console.WriteLine($"Marca: {paymentMethod.Card.Brand}");
         }
         catch (StripeException e)
         {
